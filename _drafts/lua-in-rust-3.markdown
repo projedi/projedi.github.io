@@ -61,26 +61,19 @@ Parsing Lua
 
 And so [here](https://github.com/projedi/lua-in-rust/commit/cd08246a81ab5e1935393b8ab773540c7f6b6aeb)'s a lexer for Lua.
 
-* `keyword_lexer`.
-{% highlight rust %}
-fn keyword_lexer<'a, 'b: 'a>(
-) -> Box<dyn parser_lib::Parser<'b, lua_syntax::Keyword> + 'a> {
-    parser_lib::choices(
-        lua_syntax::Keyword::create_sorted_items()
-            .iter()
-            .map(|item| {
-                let i = *item;
-                parser_lib::fmap(move |_| i,
-                                 parser_lib::string_parser(item.to_str()))
-            })
-            .collect(),
-    )
-}
-{% endhighlight %}
-  Pretty straightforward parsing: we iterate over all keywords and pick the first that matches. There's one problem
+* `keyword_lexer`.  Pretty straightforward parsing: we iterate over all keywords and pick the first that matches. There's one problem
   though: we have keywords `else` and `elseif` and if you match against `else` first, it'll succeed. To tackle it
   I first sort (`create_sorted_items`) all the keywords by length (the longest first). This way `elseif` will be
   tried before `else` is.
 * `other_token_lexer` is implemented similarly.
-* `string_literal_lexer`. Borderline unreadable beast, though simple in essence.
-* `long_brackets_lexer`. This one is rather simple: parse the opening long bracket and then parse everything until you reach the closing long bracket.
+* `string_literal_lexer`. Borderline unreadable beast, though simple in essence: read an opening quote and then repeatedly
+  read a character (except a closing quote) or an escape symbol, finally read a closing quote.
+* `long_brackets_lexer`. Parse the opening long bracket and then parse everything until you reach the closing long bracket.
+* `number_literal_lexer`. Parse the number as hexadecimal or as decimal with floating point. Notably, my parser only
+  recognises valid numbers, the actual turning into numbers is done by Rust standard library.
+* `identifier_lexer`. Essentially a `[a-zA-Z_][a-zA-Z_0-9]*`.
+* `token_lexer`. Tries each of the lexer above. It's important to try `keyword_lexer` before `identifier_lexer`, since
+  the latter will match any keyword.
+* `comment_lexer`. Parse the beginning of the comment `--` and then either parse a long bracket, or everything until end of line.
+* `whitespace_lexer`. Repeatedly parse whitespace.
+* `tokens_lexer`. Parses a possible comment or a whitespace. And then repeatedly uses `token_lexer`, followed by a comment or a whitespace.
