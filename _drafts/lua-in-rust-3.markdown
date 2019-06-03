@@ -31,7 +31,8 @@ $p enum $n {
 }
 {% endhighlight %}
 * Count items. A hacky way: for each item `$v` generate a pair `($v, 1)`, extract the second item (i.e. `1`)
-and sum all of them.
+and sum all of them. Note, that function is mark `const` so it should (must?) be evaluated at compile time, producing
+an actual constant instead of a giant `1 + 1 + ... + 0` expression.
 {% highlight rust %}
 pub const fn items_count() -> usize {
     $(($n::$v, 1).1 + )* 0
@@ -51,6 +52,9 @@ pub fn to_str(&self) -> &'static str {
     }
 }
 {% endhighlight %}
+
+Now, that I look back at it, I think it's an overkill. What I really need is to enumerate all items, everything
+else can very well be done outside a macro.
 
 
 
