@@ -19,7 +19,7 @@ Everything is pretty straightforward apart from `Keyword` and `OtherToken` defin
 of parsing them is enumerating all of them and trying one after the other. So, I need a way to enumerate all the
 elements of an enum and also convert them into string. To do that I resorted to a declarative macro.
 
-My macro that matches pattern `$p:vis $n:ident { $($v:ident => $s:literal),* $(,)?}`. First is a visibility modifier
+My macro that matches pattern `$p:vis $n:ident { $($v:ident => $s:literal),* $(,)?}`. First is an optional visibility modifier
 that'll be bound to `$p`, next is an identifier bound to `$n`, then `{`, then a (possibly empty) list of comma separated
 pairs, that are optionally terminated by a comma and finally a `}`. A list of pairs are of the form identifier `$v` followed
 by `=>` and then literal `$s`. What I wanted to express by all this is: this is an enum with visibility `$p` named `$n` and
@@ -77,3 +77,34 @@ And so [here](https://github.com/projedi/lua-in-rust/commit/cd08246a81ab5e193539
 * `comment_lexer`. Parse the beginning of the comment `--` and then either parse a long bracket, or everything until end of line.
 * `whitespace_lexer`. Repeatedly parse whitespace.
 * `tokens_lexer`. Parses a possible comment or a whitespace. And then repeatedly uses `token_lexer`, followed by a comment or a whitespace.
+
+A finishing touch
+=================
+
+While writing this post I noticed a mistake that I made: `tokens_lexer` is happy to accept the following code:
+{% highlight lua %}
+local x;
+x = "';
+{% endhighlight %}
+It produced a stream: `local x ; x =`. It correctly identified `"';` as an unfinished string and stopped parsing right there. But it didn't
+fail completely, because having an unconsumed input is not an error. Well, in the case of `tokens_lexer` it is, so I added
+{% highlight rust %}
+pub fn eof<'a, 'b: 'a>() -> Box<dyn Parser<'b, ()> + 'a> {
+    Box::new(move |s| {
+        if s.index == s.input.len() {
+            Some(((), s))
+        } else {
+            None
+        }
+    })
+}
+{% endhighlight %}
+to the `parser_lib` and used it in `tokens_lexer`. Now, when all the tokens were parsed, we check if it's the end of the input stream, and
+if it's not - we fail.
+
+Also, I moved `lua_syntax` to `lua_lexemes` and `lua_parser` to `lua_lexer`, because I'll need names `syntax` and `parser` when I actually
+parse a stream of lexemes into a syntax tree.
+
+And finally I simplified `plain_enum` macro to only generate the enumeration bit.
+
+The code is [here](https://github.com/projedi/lua-in-rust/commit/7f6c80eee731f8969ece079ca6a2ff8790cf975b).
