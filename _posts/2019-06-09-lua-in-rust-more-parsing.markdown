@@ -123,3 +123,144 @@ fn eof<'a, I: Iterator + 'a>() -> Box<dyn Parser<I, ()> + 'a> {
 Other than that, users needed to change types from `Parser<'a, T>` to `Parser<I, T>`, in `run_parser` instead of passing in `&str` you pass an iterator (or switch to `run_string_parser` that does it itself).
 
 All of this can be seen in [this commit](https://github.com/projedi/lua-in-rust/pull/2/commits/aed904f1d823be0dcf29f0f553f8be68e3d9aa41).
+
+Recursive parsers
+=================
+
+Looking at the [Lua syntax](http://www.lua.org/manual/5.1/manual.html#8), especially at `exp :: = <stuff> | unop exp`, it's apparent that I need to define parsers that reference themselves. Let's try that:
+{% highlight rust %}
+fn recursive_parser<'a, I: Iterator<Item = char> + Clone + 'a>(
+) -> Box<dyn Parser<I, u64> + 'a>
+{
+    choice(
+        fmap(|i| i + 1, seq2(char_parser('1'), recursive_parser())),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+{% endhighlight %}
+Well, it doesn't work, does it? As soon as you try to call `recursive_parser`, it'll go into an
+infinite recursion, because it's body contains an unconditional call to itself.
+
+Ok, then, let's drop the explicit recursion. Fix point combinator incoming:
+{% highlight rust %}
+fn make_recursive_parser<'a, I, T>(
+    pf: impl Fn(Box<dyn Parser<I, T> + 'a>) -> Box<dyn Parser<I, T> + 'a> + Clone + 'a,
+) -> Box<dyn Parser<I, T> + 'a> {
+    Box::new(move |s| pf(make_recursive_parser(pf.clone()))(s))
+}
+
+fn recursive_parser<'a, I: Iterator<Item = char> + Clone + 'a>(
+) -> Box<dyn Parser<I, u64> + 'a>
+{
+    make_recursive_parser(|p| {
+        choice(
+            fmap(|i| i + 1, seq2(char_parser('1'), p)),
+            fmap(|_| 0, char_parser('0')),
+        )
+    })
+}
+{% endhighlight %}
+`recursive_parser` now doesn't have explicit recursion. And neither does `make_recursive_parser`: call to
+`make_recursive_parser` is made inside the closure.
+
+Let's look at the syntax again. I see `var ::= <stuff> | prefixexp <stuff>` and `prefixexp ::= var | <stuff>`.
+Again, recursion, but this time it's mutual recursion. And a simple example:
+{% highlight rust %}
+fn mut_rec_parser1<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a> {
+    choice(
+        fmap(|i| i + 1, seq2(char_parser('1'), mut_rec_parser2())),
+        fmap(|_| 0, char_parser('0')))
+}
+
+fn mut_rec_parser2<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a> {
+    choice(
+        fmap(|i| i + 1, seq2(char_parser('2'), mut_rec_parser1())),
+        fmap(|_| 0, char_parser('0')))
+}
+{% endhighlight %}
+And solving with `make_recursive_parser` gives:
+{% highlight rust %}
+fn mut_rec_parser1<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
+{
+    make_recursive_parser(|p| mut_rec_parser1_impl(mut_rec_parser2_impl(p)))
+}
+
+fn mut_rec_parser1_impl<'a, I: Iterator<Item = char> + Clone + 'a>(
+    p: Box<dyn Parser<I, u64> + 'a>,
+) -> Box<dyn Parser<I, u64> + 'a> {
+    choice(
+        fmap(|i| i + 1, seq2(char_parser('1'), p)),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+
+fn mut_rec_parser2<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
+{
+    make_recursive_parser(|p| mut_rec_parser2_impl(mut_rec_parser1_impl(p)))
+}
+
+fn mut_rec_parser2_impl<'a, I: Iterator<Item = char> + Clone + 'a>(
+    p: Box<dyn Parser<I, u64> + 'a>,
+) -> Box<dyn Parser<I, u64> + 'a> {
+    choice(
+        fmap(|i| i + 1, seq2(char_parser('2'), p)),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+{% endhighlight %}
+This is just silly. If there were 3 mutually recursive functions, each would have needed to get two `p`s in arguments.
+
+Let's look at `make_recursive_parser` again. As I said, what makes it work is moving "recursive" call inside
+closure. So, if we could do that in `recursive_parser`, `mut_rec_parser1` and `mut_rec_parser2` themselves, it'd
+be much nicer. Luckily, we can:
+{% highlight rust %}
+fn allow_recursion<'a, I, T>(
+    pf: impl Fn() -> Box<dyn Parser<I, T> + 'a> + Clone + 'a,
+) -> Box<dyn Parser<I, T> + 'a> {
+    Box::new(move |s| pf()(s))
+}
+
+fn recursive_parser<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
+{
+    choice(
+        fmap(
+            |i| i + 1,
+            seq2(char_parser('1'), allow_recursion(recursive_parser)),
+        ),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+
+fn mut_rec_parser1<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
+{
+    choice(
+        fmap(
+            |i| i + 1,
+            seq2(char_parser('1'), allow_recursion(mut_rec_parser2)),
+        ),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+
+fn mut_rec_parser2<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
+{
+    choice(
+        fmap(
+            |i| i + 1,
+            seq2(char_parser('2'), allow_recursion(mut_rec_parser1)),
+        ),
+        fmap(|_| 0, char_parser('0')),
+    )
+}
+{% endhighlight %}
+The bodies of `recursive_parser`, `mut_rec_parser1` and `mut_rec_parser2` are what we wanted to write
+in the first place, but for recursive calls, which are changed from `f()` into `allow_recursion(f)`.
+And `allow_recursion` takes a closure that produces parsers and creates new parser that runs this closure
+inside it's parsing closure, thus avoiding recursion.
+
+Next up
+=======
+
+Commit with all the changes from this post can be found [here](https://github.com/projedi/lua-in-rust/commit/ea4422400d9e7c302ee3f27421c1c0086df6e6d8).
+Next time the adventures with recursion will continue as the need to tackle left recursion and expressions
+with binary operators arises.
