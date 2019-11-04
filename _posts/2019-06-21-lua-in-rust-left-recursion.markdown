@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: lua-in-rust
 title: "Lua in Rust: Left recursion"
 categories: "lua-in-rust"
 ---

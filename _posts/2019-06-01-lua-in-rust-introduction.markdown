@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: lua-in-rust
 title: "Lua in Rust: Introduction"
 categories: "lua-in-rust"
 ---
@@ -35,11 +35,3 @@ to make things work and the majority of tests to pass:
 4. Lua tests include native libraries which didn't build on macOS.
 5. One test doesn't pass on Lua proper, had to blacklist it, because I frankly don't understand what's going on.
 6. And quite a number of tests don't pass on LuaJIT, blacklisted all of them: after all, LuaJit is only there to compete on performance.
-
-Next steps
-==========
-
-{% assign posts = site.categories.lua-in-rust | sort: "date", "last" %}
-{% for post in posts %}
-1. [{{post.title}}]({{ site.baseurl }}{{post.url}})
-{% endfor %}

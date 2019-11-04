@@ -1,0 +1,20 @@
+---
+layout: post
+---
+
+{{ content }}
+
+<h1 id="outline">Outline</h1>
+
+{% assign posts = site.categories.lua-in-rust | sort: "date", "last" %}
+<ol>
+{% for post in posts %}
+<li>
+{% if post.id == page.id %}
+(This one) <a href="{{ site.baseurl }}{{post.url}}">{{post.title}}</a>
+{% else %}
+<a href="{{ site.baseurl }}{{post.url}}">{{post.title}}</a>
+{% endif %}
+</li>
+{% endfor %}
+</ol>

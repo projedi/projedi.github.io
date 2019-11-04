@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: lua-in-rust
 title: "Lua in Rust: Lua lexemes"
 categories: "lua-in-rust"
 ---
