@@ -9,7 +9,7 @@ Going back to `parser_lib` to move beyond lexing.
 Parse from something other than a string
 ========================================
 
-The initial `parser_lib` implementation hardcodes input as `&str`, but it's not a necessary restriction:
+The initial `parser_lib` implementation hardcodes input as `&str`, but it shouldn't be required:
 all you need from input is the ability to consequently select items from it. This is precisely what iterators
 do, so instead of
 {% highlight rust %}
