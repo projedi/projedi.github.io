@@ -12,8 +12,14 @@ Expressions with binary operators
 Let's try to parse arithmetic expressions that contain integer numbers, binary
 operators `+` `-` `*` `^` and one unary operator `-`. Usual precedence and
 associativity rules apply: `+`, `-` (binary) are least binding, then follows `*`, then `-` (unary) and finally `^`.
-`^` is right associative, others are left associative. This means, that an expression
-`0-1+2*-3^4^5` should be viewed as `((0 - 1) + (2 * (-(3^(4^5)))))`.
+`^` is right associative, others are left associative. This means, that the expression
+{% highlight rust %}
+0 - 1 + 2 * -3^4^5
+{% endhighlight %}
+should be viewed as
+{% highlight rust %}
+((0 - 1) + (2 * (-(3^(4^5)))))
+{% endhighlight %}
 
 Defining datatypes:
 {% highlight rust %}
