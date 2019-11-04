@@ -9,7 +9,7 @@ Continued exploration of combinatory parsing in Rust.
 Extracting parsed string
 ========================
 
-Thinking some more, about parsing, I arrived at the need to create a parser that
+Playing around some more, I realized I need a parser that
 would run a given parser and return a consumed string.
 {% highlight rust %}
 pub fn parsed_string<'a, T>(p: impl Parser<'a, T>) -> impl Parser<'a, (T, &'a str)> {
@@ -20,14 +20,12 @@ pub fn parsed_string<'a, T>(p: impl Parser<'a, T>) -> impl Parser<'a, (T, &'a st
 }
 {% endhighlight %}
 It's going to be useful in two places: parsing long brackets and numbers. Long brackets
-are a form of "raw" string literals that is they do not contain any escape characters or anything.
+are a form of "raw" string literals: they do not contain any escape characters or anything.
 So, I'd be able to write a parser that does nothing and only waits for the closing bracket to appear and
 then wrap it in `parsed_string` which would give me precisely the string inside the brackets.
 As for the numbers: I'd be able to parse numbers as Lua defines them and then give the resulting string
 to Rust stdlib to parse the number for me.
 
-Now, I don't know if there's a way to obtain an `x` from `a` and `b`, when `a = x + b` and all of them
-are `&'a str`, so I decided to make it simple:
 {% highlight rust %}
 #[derive(Copy, Clone)]
 struct ParserState<'a> {
@@ -110,7 +108,7 @@ The natural thing to do here is to store parser in a heap and make `p` point to 
 on line 3, on line 5 and 9 we would create a new parser, put it in an another place in a heap and make `p`
 point to it instead. I tried to do just that, but probably made some mistake as it didn't work out.
 
-Since I was tired, the solution that I finally arrived at is rather heavy handed:
+Since I was tired (protip: never do anything when you're tired), my solution is rather heavy handed:
 [everything is a Box](https://github.com/projedi/lua-in-rust/commit/b9bb4226901a06e250e918fe32843909ddf01bb3).
 All it does is changes `impl Parser<'a, T>` to `Box<dyn Parser<'a, T>`. Which puts **every** parser in a heap.
 It also added new lifetime requirement:
@@ -127,7 +125,7 @@ fn satisfies<'a, 'b>(f: impl Fn(char) -> bool + 'b) -> Box<dyn Parser<'a, char> 
     })
 }
 {% endhighlight %}
-`f` is now moved into a `Box` and so we need guarantees that `f` lives at least as long as `Parser` inside
+`f` is now moved into a `Box` and so we need to guarantee that stuff inside `f` lives at least as long as `Parser` inside
 the returned box.
 
 The downside of the approach - every parser allocates a place in a heap. It's suboptimal, I'd look at this
