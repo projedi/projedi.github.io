@@ -1,5 +1,5 @@
 ---
-layout: post
+layout: lua-in-rust
 title: "Lua in Rust: Combinatory parsing"
 categories: "lua-in-rust"
 ---
@@ -17,15 +17,15 @@ to produce very readable parsers without using parser generator tools like
 [yacc](https://en.wikipedia.org/wiki/Yacc).
 
 The main idea is that parser is a function from an input to the resulting value together
-with the rest of input, and since it's just a function, you can write it by hand, or you can
-take 2 parsers and combine it together like 2 functions, or (if your language treats functions
+with the rest of input. And since it's just a function, you can write it by hand, or you can
+take 2 parsers and compose them together, or (if your language treats functions
 as first-class citizens) you can write a function that takes parser as an input and outputs
 another parser.
 
 Rust implementation
 ===================
 
-In Rust we can write parsers like that:
+In Rust we can express parsers like that:
 {% highlight rust %}
 fn parse<'a, T>(input: &'a str) -> Option<(T, &'a str)> {
   ...
@@ -36,7 +36,7 @@ I choose to explicitly annotate lifetimes because it makes it easier for me to u
 Here by using the same `'a` on both slices I want to express that they point to one and the same
 data (albeit to different portions of it).
 
-A portion of basic parsers:
+Some basic parsers:
 * Empty parser: always succeeds, does not consume any input.
 {% highlight rust %}
 fn empty_parser<'a>(input: &'a str) -> Option<((), &'a str)> {
@@ -49,7 +49,7 @@ fn fail_parser<'a>(input: &'a str) -> Option<((), &'a str)> {
   None
 }
 {% endhighlight %}
-* A parser that checks next character in `input` and if it satisfies `f` returns it.
+* A parser that checks if the next character in `input` satisfies `f` (returning the character if it does)
 {% highlight rust %}
 fn satisfies<'a>(f: impl Fn(char) -> bool,
                  input: &'a str) -> Option<(char, &'a str)> {
@@ -57,7 +57,7 @@ fn satisfies<'a>(f: impl Fn(char) -> bool,
     // the function immediately returns None. That's what ? does.
     let c = input[0..].chars().next()?;
     if f(c) {
-        // If character c is alright, return it and forward input 1 character.
+        // If character c satisfies f, return it and forward input 1 character.
         Some((c, &input[1..]))
     } else {
         // Otherwise just fail.
@@ -81,8 +81,8 @@ fn seq<'a, T1, T2>(p1: impl Fn(&'a str) -> Option<(T1, &'a str)>,
     Some(((p1_result, p2_result), input))
 }
 {% endhighlight %}
-Just like in a previous parser, this one takes functions as arguments, however, this time
-this functions are actually parsers. So `seq` is the first example of a parser combinator.
+Just like a previous parser, this one takes functions as arguments, however, this time
+these functions are parsers. So `seq` is the first example of a parser combinator.
 
 Now, let's try to use this parser library.
 {% highlight rust %}
@@ -160,7 +160,7 @@ Day 1 and it's already time for hacks
 =====================================
 
 What's not so nice is all the `impl Fn(&'a str) -> Option<(..., &'a str)>` lying around.
-What I really want is to make a trait alias, but it's not yet done (see [here](https://github.com/rust-lang/rust/issues/41517)). So, time for a hack:
+What I really want is to make a trait alias, but there's no such thing yet (see [here](https://github.com/rust-lang/rust/issues/41517)). So, time for a hack:
 {% highlight rust %}
 trait Parser<'a, T>: Fn(&'a str) -> Option<(T, &'a str)> {}
 impl<'a, T, F : Fn(&'a str) -> Option<(T, &'a str)>> Parser<'a, T> for F {}
