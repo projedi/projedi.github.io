@@ -11,7 +11,7 @@ Parse from something other than a string
 
 The initial `parser_lib` implementation hardcodes input as `&str`, but it shouldn't be required:
 all you need from input is the ability to consequently select items from it. This is precisely what iterators
-do, so instead of
+do, so
 {% highlight rust %}
 #[derive(Copy, Clone)]
 struct ParserState<'a> {
@@ -19,7 +19,7 @@ struct ParserState<'a> {
     index: usize,
   }
 {% endhighlight %}
-we now have
+is now
 {% highlight rust %}
 #[derive(Clone)]
 struct ParserState<I> {
@@ -27,7 +27,7 @@ struct ParserState<I> {
     consumed_count: usize,
 }
 {% endhighlight %}
-So, instead of an immutable `input`, which points to the entire input string (a change I made [here]({% post_url 2019-06-03-lua-in-rust-combinatory-parsing-cont %})) I now need to go back to a mutable thing pointing directly at the next symbol to parse. `consumed_count` is essentially the same as `index`, but with a more suggestive (I hope) name.
+Instead of an immutable `input`, which points to the entire input string (a change I made [here]({% post_url 2019-06-03-lua-in-rust-combinatory-parsing-cont %})) I now need to go back to a mutable thing pointing directly at the next symbol to parse. `consumed_count` is essentially the same as `index`, but with a more suggestive (I hope) name.
 Also, I removed a `Copy` trait because it's too restrictive on types of iterators allowed.
 
 Now, the code, that needed to change significantly:
@@ -141,7 +141,7 @@ fn recursive_parser<'a, I: Iterator<Item = char> + Clone + 'a>(
 Well, it doesn't work, does it? As soon as you try to call `recursive_parser`, it'll go into an
 infinite recursion, because it's body contains an unconditional call to itself.
 
-Ok, then, let's drop the explicit recursion. Fix point combinator incoming:
+Ok, let's drop the explicit recursion. Fix point combinator incoming:
 {% highlight rust %}
 fn make_recursive_parser<'a, I, T>(
     pf: impl Fn(Box<dyn Parser<I, T> + 'a>) -> Box<dyn Parser<I, T> + 'a> + Clone + 'a,
@@ -178,7 +178,7 @@ fn mut_rec_parser2<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parse
         fmap(|_| 0, char_parser('0')))
 }
 {% endhighlight %}
-And solving with `make_recursive_parser` gives:
+Applying `make_recursive_parser` gives:
 {% highlight rust %}
 fn mut_rec_parser1<'a, I: Iterator<Item = char> + Clone + 'a>() -> Box<dyn Parser<I, u64> + 'a>
 {
@@ -210,8 +210,8 @@ fn mut_rec_parser2_impl<'a, I: Iterator<Item = char> + Clone + 'a>(
 {% endhighlight %}
 This is just silly. If there were 3 mutually recursive functions, each would have needed to get two `p`s in arguments.
 
-Let's look at `make_recursive_parser` again. As I said, what makes it work is moving "recursive" call inside
-closure. So, if we could do that in `recursive_parser`, `mut_rec_parser1` and `mut_rec_parser2` themselves, it'd
+Let's look at `make_recursive_parser` again. The thing, that made it work is moving "recursive" call inside
+a closure. So, if we could do that in `recursive_parser`, `mut_rec_parser1` and `mut_rec_parser2` themselves, it'd
 be much nicer. Luckily, we can:
 {% highlight rust %}
 fn allow_recursion<'a, I, T>(
