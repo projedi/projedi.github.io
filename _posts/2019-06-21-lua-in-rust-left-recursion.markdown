@@ -56,7 +56,6 @@ fn num_parser<'a, 'b: 'a>() -> Box<dyn Parser<std::str::Chars<'b>, f64> + 'a> {
 
 fn exp_parser<'a, 'b: 'a>() -> Box<dyn Parser<std::str::Chars<'b>, Exp> + 'a> {
     choices(vec![
-        fmap(Exp::Num, num_parser()),
         fmap(
             |(lhs, (op, rhs))| Exp::BinOp(Box::new(lhs), op, Box::new(rhs)),
             seq(allow_recursion(exp_parser),
@@ -64,18 +63,17 @@ fn exp_parser<'a, 'b: 'a>() -> Box<dyn Parser<std::str::Chars<'b>, Exp> + 'a> {
         fmap(
             |(op, e)| Exp::UnOp(op, Box::new(e)),
             seq(unop_parser(), allow_recursion(exp_parser))),
+        fmap(Exp::Num, num_parser()),
     ])
 }
 {% endhighlight %}
 
 This, of course, does not work. First of all, we say nothing about precedence or associativity,
-so this code has no chance of doing the right thing. Second of all, what happens when it encounters
-`1+2`: `choices` tries the first parser which successfully yields `1` and stops. Okay, then, move
-`fmap(Exp::Num, num_parser())` to the last position. Which brings us to the third of all: `choices`
-will try to parse a binary expression by `fmap(..., seq(allow_recursion(exp_parser), ...))`, so
-the first thing it'll do is recursively call `exp_parser`, which will, again, recursively call
-`exp_parser` with exactly the same state, so this is an infinite recursion. This last problem is
-known as left recursion. Fortunately, there's a way to get rid of it.
+so this code has no chance of doing the right thing. Second of all: `choices` will try to parse
+a binary expression by `fmap(..., seq(allow_recursion(exp_parser), ...))`, so the first thing
+it'll do (without consuming any input) is recursively call `exp_parser`, which will, again,
+recursively call `exp_parser` with exactly the same state, so this is an infinite recursion.
+This last problem is known as the left recursion. Fortunately, there's a way to get rid of it.
 
 Transforming parser to eliminate left recursion
 ===============================================
