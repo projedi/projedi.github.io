@@ -4,8 +4,6 @@ description: >
   Ramblings about software development.
 baseurl: ""
 url: "https://blog.ashabalin.me"
-twitter_username: projedi
-github_username:  projedi
 
 # Build settings
 markdown: kramdown
